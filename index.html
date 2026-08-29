@@ -607,6 +607,12 @@ function resizeImageToDataUrl(file, maxSize){
    ========================================================= */
 let currentUserDoc = null; // data from Firestore users/{uid}
 let currentUid = null;
+// Guards against a race condition: right after auth.createUserWithEmailAndPassword()
+// resolves, onAuthStateChanged fires immediately -- before the registration
+// transaction below has had a chance to write the real username/profile doc.
+// Without this flag, the listener would see "no profile yet" and auto-repair
+// the account with a random placeholder username, overwriting the real one.
+let isRegistering = false;
 
 /* ---------- show correct starting screen ---------- */
 window.addEventListener('DOMContentLoaded', () => {
@@ -622,6 +628,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('volumeValue').textContent = savedVol;
 
   auth.onAuthStateChanged(async (user) => {
+    if(isRegistering){
+      // The register handler is in the middle of creating this account and
+      // will load the profile + show the app itself once it's done.
+      return;
+    }
     if(user){
       currentUid = user.uid;
       try{
@@ -713,6 +724,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }
 
     // 2. create Firebase Auth account (random internal email)
+    isRegistering = true; // block onAuthStateChanged's auto-repair until we're done
     const internalEmail = crypto.randomUUID() + INTERNAL_DOMAIN;
     const cred = await auth.createUserWithEmailAndPassword(internalEmail, password);
     const uid = cred.user.uid;
@@ -742,10 +754,17 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       throw txErr;
     }
 
+    // Profile doc now exists with the real username -- load it and enter the
+    // app ourselves (isRegistering blocked the listener from doing this).
+    currentUid = uid;
+    await loadUserDoc(uid);
+    isRegistering = false;
+    showApp();
+
     sfx.success();
     setAuthMsg('Account created! Welcome, ' + usernameRaw + '.', 'ok');
-    // onAuthStateChanged will switch the view automatically
   }catch(err){
+    isRegistering = false;
     console.error(err);
     sfx.error();
     if(err.message === 'USERNAME_TAKEN'){
@@ -1120,7 +1139,10 @@ document.getElementById('changeUsernameBtn').addEventListener('click', async () 
     await db.runTransaction(async (tx) => {
       const newRef = db.collection('usernames').doc(newLower);
       const newSnap = await tx.get(newRef);
-      if(newSnap.exists){
+      // Only block if the name is reserved by someone ELSE. If it's already
+      // reserved under this same uid (e.g. left over from the registration
+      // race-condition bug), let the user reclaim it.
+      if(newSnap.exists && newSnap.data().uid !== currentUid){
         throw new Error('USERNAME_TAKEN');
       }
       const oldRef = db.collection('usernames').doc(oldLower);
