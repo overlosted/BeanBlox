@@ -289,6 +289,39 @@
   .icon-action-btn.active-dislike{color:var(--err);border-color:var(--err);}
   .icon-action-btn.active-favorite{color:var(--yellow);border-color:var(--yellow);}
 
+  /* ---------- CHAT ---------- */
+  .chat-card{display:flex;flex-direction:column;height:calc(100vh - 170px);max-height:640px;}
+  .chat-messages{
+    flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;
+    padding:4px 4px 4px 0;margin-bottom:14px;
+  }
+  .chat-empty{color:var(--muted);text-align:center;padding:40px 0;font-size:13px;}
+  .chat-message{display:flex;gap:10px;align-items:flex-start;}
+  .chat-message .mini-avatar{
+    width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .chat-message .mini-avatar img{width:100%;height:100%;object-fit:cover;}
+  .chat-message .mini-avatar svg{width:20px;height:20px;}
+  .chat-message-body{min-width:0;flex:1;}
+  .chat-message-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .chat-message-name{
+    background:none;border:none;padding:0;font:inherit;font-weight:700;font-size:13px;
+    color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-color:transparent;
+    transition:color .15s, text-decoration-color .15s;
+  }
+  .chat-message-name:hover{color:var(--yellow);text-decoration-color:var(--yellow);}
+  .chat-message-time{font-size:10.5px;color:var(--muted);}
+  .chat-message-text{font-size:13.5px;color:var(--text);margin-top:2px;line-height:1.45;white-space:pre-wrap;word-break:break-word;}
+  .chat-input-row{display:flex;gap:10px;}
+  .chat-input-row input{
+    flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:11px 14px;border-radius:10px;font-size:14px;outline:none;
+    font-family:inherit;transition:border-color .15s;
+  }
+  .chat-input-row input:focus{border-color:var(--yellow);}
+  .chat-input-row .btn{width:auto;padding:11px 24px;flex-shrink:0;}
+
   /* ---------- SETTINGS ---------- */
   .slider-row{display:flex;align-items:center;gap:16px;}
   input[type=range]{
@@ -378,6 +411,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8.5" cy="7.5" r="3.2"/><path d="M2.5 19c0-3.4 2.7-6 6-6s6 2.6 6 6"/><circle cx="17" cy="8" r="2.6"/><path d="M15.3 12.8c2.6.5 4.4 2.7 4.4 5.3"/></svg>
         Profiles
       </button>
+      <button data-page="chat" class="nav-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+        Chat
+      </button>
       <button data-page="settings" class="nav-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z"/></svg>
         Settings
@@ -465,6 +502,21 @@
           <div class="section-label">Recommended</div>
           <div id="recommendedProfiles" class="profile-grid"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- CHAT PAGE -->
+    <div id="page-chat" class="page hidden">
+      <div class="card chat-card">
+        <h1>Chat</h1>
+        <p class="muted" style="margin-bottom:16px;">Talk with everyone on BeanBlox in real time.</p>
+
+        <div id="chatMessages" class="chat-messages"></div>
+
+        <form id="chatForm" class="chat-input-row">
+          <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500" autocomplete="off">
+          <button type="submit" class="btn" id="chatSendBtn">Send</button>
+        </form>
       </div>
     </div>
 
@@ -1046,6 +1098,10 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if(btn.dataset.page === 'profiles'){
       loadRecommendedProfiles();
     }
+    if(btn.dataset.page === 'chat'){
+      startChatListener();
+      document.getElementById('chatInput').focus();
+    }
   });
 });
 
@@ -1183,6 +1239,88 @@ document.getElementById('profileViewModal').addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if(e.key === 'Escape') closeProfileView();
+});
+
+/* =========================================================
+   CHAT — global, real-time (Firestore onSnapshot)
+   ========================================================= */
+let chatListenerAttached = false;
+
+function startChatListener(){
+  if(chatListenerAttached) return;
+  chatListenerAttached = true;
+  const box = document.getElementById('chatMessages');
+  db.collection('chatMessages')
+    .orderBy('createdAt', 'desc')
+    .limit(100)
+    .onSnapshot((snap) => {
+      const msgs = [];
+      snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
+      msgs.reverse(); // oldest first
+      renderChatMessages(msgs);
+    }, (err) => {
+      console.error('Chat listener error:', err);
+      box.innerHTML = '<div class="chat-empty">Could not load chat (check Firestore rules).</div>';
+    });
+}
+
+function renderChatMessages(msgs){
+  const box = document.getElementById('chatMessages');
+  const wasNearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+
+  if(msgs.length === 0){
+    box.innerHTML = '<div class="chat-empty">No messages yet. Say hi!</div>';
+    return;
+  }
+
+  box.innerHTML = msgs.map(msg => {
+    const time = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate() : null;
+    const timeStr = time ? time.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : '';
+    return `<div class="chat-message">
+      <div class="mini-avatar">${renderAvatarContent({avatarPhoto: msg.avatarPhoto, avatarIcon: msg.avatarIcon}, 34)}</div>
+      <div class="chat-message-body">
+        <div class="chat-message-head">
+          <button class="chat-message-name" type="button" data-uid="${msg.uid}">${escapeHtml(msg.username || '?')}</button>
+          <span class="chat-message-time">${timeStr}</span>
+        </div>
+        <div class="chat-message-text">${escapeHtml(msg.text || '')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.chat-message-name').forEach(btn => {
+    btn.addEventListener('click', () => openProfileView(btn.dataset.uid));
+  });
+
+  if(wasNearBottom){
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+document.getElementById('chatForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text || !currentUid || !currentUserDoc) return;
+
+  const sendBtn = document.getElementById('chatSendBtn');
+  sendBtn.disabled = true;
+  try{
+    await db.collection('chatMessages').add({
+      uid: currentUid,
+      username: currentUserDoc.username,
+      avatarPhoto: currentUserDoc.avatarPhoto || null,
+      avatarIcon: currentUserDoc.avatarIcon || null,
+      text: text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    input.value = '';
+    sfx.click();
+  }catch(err){
+    console.error('Failed to send message:', err);
+  }
+  sendBtn.disabled = false;
+  input.focus();
 });
 
 /* =========================================================
