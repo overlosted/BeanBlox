@@ -275,7 +275,10 @@
   }
   .game-play-btn:hover{background:#ffd84d;}
   .game-play-btn:active{transform:scale(0.97);}
-  .game-icon-actions{display:flex;gap:6px;margin-left:auto;}
+  .game-icon-actions{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  .like-with-count{display:flex;align-items:center;gap:5px;}
+  .like-count{font-size:12px;font-weight:700;color:var(--muted);min-width:10px;text-align:left;}
+  .like-with-count.is-liked .like-count{color:var(--ok);}
   .icon-action-btn{
     width:34px;height:34px;border-radius:50%;padding:0;
     background:var(--panel);border:1px solid var(--border);color:var(--muted);
@@ -596,6 +599,35 @@ const ICON_STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 let gameInteractions = {};
 GAMES.forEach(g => { gameInteractions[g.id] = { like:false, dislike:false, favorite:false }; });
 
+// Public like counts, visible to everyone (Firestore: gameStats/{gameId}.likes).
+let gameLikeCounts = {};
+GAMES.forEach(g => { gameLikeCounts[g.id] = 0; });
+let gameStatsListenerAttached = false;
+
+function startGameStatsListener(){
+  if(gameStatsListenerAttached) return;
+  gameStatsListenerAttached = true;
+  db.collection('gameStats').onSnapshot((snap) => {
+    snap.forEach(doc => {
+      gameLikeCounts[doc.id] = doc.data().likes || 0;
+    });
+    renderGamesPage();
+  }, (err) => {
+    console.error('Game stats listener error:', err);
+  });
+}
+
+// Bumps the public like counter for a game up or down by 1.
+async function updateGameLikeCount(id, delta){
+  try{
+    await db.collection('gameStats').doc(id).set({
+      likes: firebase.firestore.FieldValue.increment(delta)
+    }, { merge: true });
+  }catch(e){
+    console.error('Failed to update like count:', e);
+  }
+}
+
 // Pulls saved like/dislike/favorite state for each game from the account's
 // Firestore doc (users/{uid}.gameInteractions), so it survives refreshes and
 // follows the account across devices/browsers.
@@ -628,6 +660,7 @@ async function saveGameInteraction(id){
 
 function renderGameCard(game){
   const st = gameInteractions[game.id];
+  const likeCount = gameLikeCounts[game.id] || 0;
   return `<div class="game-card" data-id="${game.id}">
     <div class="game-info">
       <div class="game-title">${escapeHtml(game.title)}</div>
@@ -635,7 +668,10 @@ function renderGameCard(game){
       <div class="game-actions">
         <button class="game-play-btn" data-play="${game.id}" data-url="${escapeHtml(game.url || '')}" type="button">Play</button>
         <div class="game-icon-actions">
-          <button class="icon-action-btn ${st.like ? 'active-like' : ''}" data-action="like" data-id="${game.id}" type="button" title="Like">${ICON_LIKE}</button>
+          <div class="like-with-count ${st.like ? 'is-liked' : ''}">
+            <button class="icon-action-btn ${st.like ? 'active-like' : ''}" data-action="like" data-id="${game.id}" type="button" title="Like">${ICON_LIKE}</button>
+            <span class="like-count">${likeCount}</span>
+          </div>
           <button class="icon-action-btn ${st.dislike ? 'active-dislike' : ''}" data-action="dislike" data-id="${game.id}" type="button" title="Dislike">${ICON_DISLIKE}</button>
           <button class="icon-action-btn ${st.favorite ? 'active-favorite' : ''}" data-action="favorite" data-id="${game.id}" type="button" title="Favorite">${ICON_STAR}</button>
         </div>
@@ -680,6 +716,7 @@ async function openProfileByUsername(username){
 function toggleGameAction(id, action){
   const st = gameInteractions[id];
   if(!st) return;
+  const wasLiked = st.like;
   if(action === 'like'){
     st.like = !st.like;
     if(st.like) st.dislike = false;
@@ -689,9 +726,18 @@ function toggleGameAction(id, action){
   } else if(action === 'favorite'){
     st.favorite = !st.favorite;
   }
+
+  const likeDelta = (st.like ? 1 : 0) - (wasLiked ? 1 : 0);
+  if(likeDelta !== 0){
+    gameLikeCounts[id] = Math.max(0, (gameLikeCounts[id] || 0) + likeDelta); // instant local feedback
+  }
+
   sfx.nav();
   renderGamesPage();
   saveGameInteraction(id);
+  if(likeDelta !== 0){
+    updateGameLikeCount(id, likeDelta); // synced to everyone via the live listener
+  }
 }
 
 function renderGamesPage(){
@@ -910,6 +956,7 @@ function showApp(){
   syncVolumeSliderFromAccount();
   loadGameInteractionsFromAccount();
   renderGamesPage();
+  startGameStatsListener();
 }
 
 // Reflects the account's saved volume (falls back to localStorage/default if
