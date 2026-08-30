@@ -655,7 +655,15 @@ if (isConfigFilled(firebaseConfig)) {
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let actx = null;
 function getVolume(){
-  const v = parseInt(localStorage.getItem('bb_volume') ?? '40', 10);
+  // Prefer the value saved on the account (syncs across devices/browsers).
+  // Fall back to localStorage for the logged-out auth screen, or before the
+  // profile has finished loading.
+  let v;
+  if(currentUserDoc && currentUserDoc.sfxVolume !== undefined && currentUserDoc.sfxVolume !== null){
+    v = currentUserDoc.sfxVolume;
+  } else {
+    v = parseInt(localStorage.getItem('bb_volume') ?? '40', 10);
+  }
   return Math.min(1, Math.max(0, v / 100)) * 0.5; // scaled so "100%" isn't too loud
 }
 function beep(freq, duration, type='sine'){
@@ -816,6 +824,21 @@ function showApp(){
   document.getElementById('appScreen').classList.remove('hidden');
   renderProfile();
   renderTopChip();
+  syncVolumeSliderFromAccount();
+}
+
+// Reflects the account's saved volume (falls back to localStorage/default if
+// this account has never set one yet) in the Settings slider.
+function syncVolumeSliderFromAccount(){
+  let v = 40;
+  if(currentUserDoc && currentUserDoc.sfxVolume !== undefined && currentUserDoc.sfxVolume !== null){
+    v = currentUserDoc.sfxVolume;
+  } else {
+    v = parseInt(localStorage.getItem('bb_volume') ?? '40', 10);
+  }
+  document.getElementById('volumeSlider').value = v;
+  document.getElementById('volumeValue').textContent = v;
+  localStorage.setItem('bb_volume', v);
 }
 
 /* =========================================================
@@ -1330,6 +1353,16 @@ document.getElementById('volumeSlider').addEventListener('input', (e) => {
   const val = e.target.value;
   document.getElementById('volumeValue').textContent = val;
   localStorage.setItem('bb_volume', val);
+});
+document.getElementById('volumeSlider').addEventListener('change', async (e) => {
+  const val = parseInt(e.target.value, 10);
+  if(currentUserDoc) currentUserDoc.sfxVolume = val; // update local copy immediately
+  if(!currentUid) return;
+  try{
+    await db.collection('users').doc(currentUid).update({ sfxVolume: val });
+  }catch(err){
+    console.error('Failed to save volume to account:', err);
+  }
 });
 document.getElementById('testSoundBtn').addEventListener('click', () => {
   sfx.success();
