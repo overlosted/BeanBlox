@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BEANBLOX</title>
+<title>BeanBlox</title>
 <style>
   :root{
     --bg:#0e0e0e;
@@ -250,6 +250,45 @@
   }
   .modal-bio.empty{color:var(--muted);font-style:italic;}
 
+  /* ---------- GAMES: RECOMMENDED / FAVORITES ---------- */
+  #favoritesSection{margin-top:26px;}
+  .game-grid{display:flex;flex-direction:column;gap:14px;}
+  .game-card{
+    display:flex;gap:16px;
+    background:var(--panel2);border:1px solid var(--border);
+    border-radius:14px;padding:16px;
+  }
+  .game-info{flex:1;min-width:0;}
+  .game-title{font-weight:800;font-size:16px;color:var(--text);}
+  .game-author{font-size:12px;color:var(--muted);margin-top:2px;}
+  .game-author-link{
+    background:none;border:none;padding:0;font:inherit;color:var(--muted);
+    cursor:pointer;text-decoration:underline;text-decoration-color:transparent;
+    transition:color .15s, text-decoration-color .15s;
+  }
+  .game-author-link:hover{color:var(--yellow);text-decoration-color:var(--yellow);}
+  .game-actions{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  .game-play-btn{
+    background:var(--yellow);color:#111;border:none;border-radius:9px;
+    padding:9px 22px;font-weight:800;font-size:13px;cursor:pointer;
+    transition:transform .1s, background .15s;
+  }
+  .game-play-btn:hover{background:#ffd84d;}
+  .game-play-btn:active{transform:scale(0.97);}
+  .game-icon-actions{display:flex;gap:6px;margin-left:auto;}
+  .icon-action-btn{
+    width:34px;height:34px;border-radius:50%;padding:0;
+    background:var(--panel);border:1px solid var(--border);color:var(--muted);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:border-color .15s, color .15s, transform .1s;
+  }
+  .icon-action-btn svg{width:16px;height:16px;}
+  .icon-action-btn:hover{border-color:var(--yellow);color:var(--yellow);}
+  .icon-action-btn:active{transform:scale(0.92);}
+  .icon-action-btn.active-like{color:var(--ok);border-color:var(--ok);}
+  .icon-action-btn.active-dislike{color:var(--err);border-color:var(--err);}
+  .icon-action-btn.active-favorite{color:var(--yellow);border-color:var(--yellow);}
+
   /* ---------- SETTINGS ---------- */
   .slider-row{display:flex;align-items:center;gap:16px;}
   input[type=range]{
@@ -360,10 +399,13 @@
       <div class="card">
         <h1>Games</h1>
         <p class="muted">Browse and play games made by the community.</p>
-        <div class="empty-state">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="10" rx="5"/><path d="M7 10v4M5 12h4"/><circle cx="16" cy="10.5" r="1"/><circle cx="18.5" cy="13" r="1"/></svg>
-          <div class="big">No games yet</div>
-          <div>There's nothing here right now. Check back later.</div>
+
+        <div class="section-label">Recommended</div>
+        <div id="recommendedGames" class="game-grid"></div>
+
+        <div id="favoritesSection" class="hidden">
+          <div class="section-label" style="margin-top:26px;">Favorites</div>
+          <div id="favoriteGames" class="game-grid"></div>
         </div>
       </div>
     </div>
@@ -481,6 +523,111 @@ const firebaseConfig = {
   appId: "1:205790490959:web:51d5f0b6d970fde78f953a"
 };
 /* ========================================================= */
+
+/* =========================================================
+   GAMES: RECOMMENDED / FAVORITES
+   (client-side only for now — Play button doesn't do anything yet)
+   ========================================================= */
+const GAMES = [
+  {
+    id: 'beaver-clicker',
+    title: 'BeaverClicker',
+    author: 'Sigma_Artur',
+    url: 'https://overlosted.github.io/BeaverClicker/',
+  },
+];
+
+const ICON_LIKE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h3Zm0 0 5-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 1.9 2.7l-2.5 7A2 2 0 0 1 17 21H7"/></svg>';
+const ICON_DISLIKE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3Zm0 0-5 7a2 2 0 0 1-2-2v-4H4.5a2 2 0 0 1-1.9-2.7l2.5-7A2 2 0 0 1 7 3h10"/></svg>';
+const ICON_STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7L2 9.2l7.1-.6L12 2Z"/></svg>';
+
+let gameInteractions = {};
+GAMES.forEach(g => { gameInteractions[g.id] = { like:false, dislike:false, favorite:false }; });
+
+function renderGameCard(game){
+  const st = gameInteractions[game.id];
+  return `<div class="game-card" data-id="${game.id}">
+    <div class="game-info">
+      <div class="game-title">${escapeHtml(game.title)}</div>
+      <div class="game-author">by <button class="game-author-link" type="button" data-author="${escapeHtml(game.author)}">${escapeHtml(game.author)}</button></div>
+      <div class="game-actions">
+        <button class="game-play-btn" data-play="${game.id}" data-url="${escapeHtml(game.url || '')}" type="button">Play</button>
+        <div class="game-icon-actions">
+          <button class="icon-action-btn ${st.like ? 'active-like' : ''}" data-action="like" data-id="${game.id}" type="button" title="Like">${ICON_LIKE}</button>
+          <button class="icon-action-btn ${st.dislike ? 'active-dislike' : ''}" data-action="dislike" data-id="${game.id}" type="button" title="Dislike">${ICON_DISLIKE}</button>
+          <button class="icon-action-btn ${st.favorite ? 'active-favorite' : ''}" data-action="favorite" data-id="${game.id}" type="button" title="Favorite">${ICON_STAR}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function wireGameCards(container){
+  container.querySelectorAll('[data-play]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.dataset.url;
+      if(url) window.open(url, '_blank', 'noopener');
+    });
+  });
+  container.querySelectorAll('.icon-action-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleGameAction(btn.dataset.id, btn.dataset.action);
+    });
+  });
+  container.querySelectorAll('.game-author-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openProfileByUsername(btn.dataset.author);
+    });
+  });
+}
+
+// Looks up a uid by username (same as the Profiles search) and opens their profile.
+async function openProfileByUsername(username){
+  try{
+    const snap = await db.collection('usernames').doc(username.toLowerCase()).get();
+    if(!snap.exists){
+      console.warn('No profile found for username:', username);
+      return;
+    }
+    openProfileView(snap.data().uid);
+  }catch(e){
+    console.error('Failed to open author profile:', e);
+  }
+}
+
+function toggleGameAction(id, action){
+  const st = gameInteractions[id];
+  if(!st) return;
+  if(action === 'like'){
+    st.like = !st.like;
+    if(st.like) st.dislike = false;
+  } else if(action === 'dislike'){
+    st.dislike = !st.dislike;
+    if(st.dislike) st.like = false;
+  } else if(action === 'favorite'){
+    st.favorite = !st.favorite;
+  }
+  sfx.nav();
+  renderGamesPage();
+}
+
+function renderGamesPage(){
+  const recBox = document.getElementById('recommendedGames');
+  recBox.innerHTML = GAMES.map(renderGameCard).join('');
+  wireGameCards(recBox);
+
+  const favGames = GAMES.filter(g => gameInteractions[g.id].favorite);
+  const favSection = document.getElementById('favoritesSection');
+  const favBox = document.getElementById('favoriteGames');
+  if(favGames.length > 0){
+    favSection.classList.remove('hidden');
+    favBox.innerHTML = favGames.map(renderGameCard).join('');
+    wireGameCards(favBox);
+  } else {
+    favSection.classList.add('hidden');
+    favBox.innerHTML = '';
+  }
+}
 
 const INTERNAL_DOMAIN = "@beanblox.internal"; // fake email, never shown to the user
 
@@ -626,6 +773,8 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedVol = localStorage.getItem('bb_volume') ?? '40';
   document.getElementById('volumeSlider').value = savedVol;
   document.getElementById('volumeValue').textContent = savedVol;
+
+  renderGamesPage();
 
   auth.onAuthStateChanged(async (user) => {
     if(isRegistering){
