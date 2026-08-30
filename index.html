@@ -544,6 +544,36 @@ const ICON_STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 let gameInteractions = {};
 GAMES.forEach(g => { gameInteractions[g.id] = { like:false, dislike:false, favorite:false }; });
 
+// Pulls saved like/dislike/favorite state for each game from the account's
+// Firestore doc (users/{uid}.gameInteractions), so it survives refreshes and
+// follows the account across devices/browsers.
+function loadGameInteractionsFromAccount(){
+  const saved = (currentUserDoc && currentUserDoc.gameInteractions) || {};
+  GAMES.forEach(g => {
+    const s = saved[g.id];
+    gameInteractions[g.id] = {
+      like: !!(s && s.like),
+      dislike: !!(s && s.dislike),
+      favorite: !!(s && s.favorite),
+    };
+  });
+}
+
+async function saveGameInteraction(id){
+  if(!currentUid) return;
+  try{
+    await db.collection('users').doc(currentUid).update({
+      [`gameInteractions.${id}`]: gameInteractions[id]
+    });
+    if(currentUserDoc){
+      if(!currentUserDoc.gameInteractions) currentUserDoc.gameInteractions = {};
+      currentUserDoc.gameInteractions[id] = gameInteractions[id];
+    }
+  }catch(e){
+    console.error('Failed to save game interaction:', e);
+  }
+}
+
 function renderGameCard(game){
   const st = gameInteractions[game.id];
   return `<div class="game-card" data-id="${game.id}">
@@ -609,6 +639,7 @@ function toggleGameAction(id, action){
   }
   sfx.nav();
   renderGamesPage();
+  saveGameInteraction(id);
 }
 
 function renderGamesPage(){
@@ -825,6 +856,8 @@ function showApp(){
   renderProfile();
   renderTopChip();
   syncVolumeSliderFromAccount();
+  loadGameInteractionsFromAccount();
+  renderGamesPage();
 }
 
 // Reflects the account's saved volume (falls back to localStorage/default if
