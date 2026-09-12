@@ -598,6 +598,7 @@
           <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500" autocomplete="off">
           <button type="submit" class="btn" id="chatSendBtn">Send</button>
         </form>
+        <p class="muted" id="chatCharLimitHint" style="margin-top:6px;">Max 500 characters.</p>
       </div>
     </div>
 
@@ -622,6 +623,10 @@
             <li>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
               A crown badge next to your name
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+              A 1000 character limit instead of 500
             </li>
           </ul>
         </div>
@@ -681,6 +686,7 @@
           <div class="field">
             <label for="createMessageInput">Message</label>
             <textarea id="createMessageInput" placeholder="Tell us about your game..." maxlength="500" required></textarea>
+            <p class="muted" id="createCharLimitHint" style="margin-top:6px;">Max 500 characters.</p>
           </div>
           <div id="createMsg" class="msg"></div>
           <button type="submit" class="btn" id="createSubmitBtn">Create</button>
@@ -1055,6 +1061,51 @@ function isPlusActive(userDoc){
   return until.getTime() > Date.now();
 }
 
+/* =========================================================
+   MESSAGE CHARACTER LIMITS (chat + Create)
+   Allowed characters: letters, numbers, spaces, and ?!#
+   Free users: 500 characters. Bean Plus members: 1000 characters.
+   ========================================================= */
+const MESSAGE_ALLOWED_CHARS_REGEX = /[^a-zA-Z0-9?!# ]/g;
+const MESSAGE_CHAR_LIMIT_FREE = 500;
+const MESSAGE_CHAR_LIMIT_PLUS = 1000;
+
+// Returns the current character limit for chat/Create messages based on Bean Plus status.
+function getMessageCharLimit(){
+  return isPlusActive(currentUserDoc) ? MESSAGE_CHAR_LIMIT_PLUS : MESSAGE_CHAR_LIMIT_FREE;
+}
+
+// Removes any character that isn't a letter, number, space, or ?!#
+function sanitizeMessageInput(value){
+  return (value || '').replace(MESSAGE_ALLOWED_CHARS_REGEX, '');
+}
+
+// Applies the allowed-character filter and the dynamic max length (500, or 1000
+// with Bean Plus) to a chat/Create text field. Keeps the caret position stable.
+function enforceMessageLimits(el){
+  const limit = getMessageCharLimit();
+  el.setAttribute('maxlength', String(limit));
+  const cleaned = sanitizeMessageInput(el.value).slice(0, limit);
+  if(cleaned !== el.value){
+    const pos = el.selectionStart;
+    const removedBefore = el.value.slice(0, pos).length - sanitizeMessageInput(el.value.slice(0, pos)).length;
+    el.value = cleaned;
+    const newPos = Math.max(0, Math.min(cleaned.length, pos - removedBefore));
+    el.setSelectionRange(newPos, newPos);
+  }
+}
+
+// Refreshes maxlength/hint text for a chat/Create field to match current Bean Plus status
+// (used when a page is opened, without touching whatever the user already typed).
+function refreshMessageLimitUI(inputEl, hintEl){
+  const limit = getMessageCharLimit();
+  inputEl.setAttribute('maxlength', String(limit));
+  if(hintEl){
+    hintEl.textContent = 'Max ' + limit + ' characters.'
+      + (limit === MESSAGE_CHAR_LIMIT_FREE ? '' : ' (Bean Plus)');
+  }
+}
+
 // Resizes/compresses an uploaded image to a small square JPEG data URL so it fits comfortably in Firestore.
 function resizeImageToDataUrl(file, maxSize){
   return new Promise((resolve, reject) => {
@@ -1404,6 +1455,8 @@ function renderCreateSubmissions(subs){
   });
 }
 
+document.getElementById('createMessageInput').addEventListener('input', (e) => enforceMessageLimits(e.target));
+
 document.getElementById('createForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const linkInput = document.getElementById('createLinkInput');
@@ -1412,7 +1465,7 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
   const submitBtn = document.getElementById('createSubmitBtn');
 
   const link = linkInput.value.trim();
-  const message = messageInput.value.trim();
+  const message = sanitizeMessageInput(messageInput.value.trim()).slice(0, getMessageCharLimit());
   msg.className = 'msg';
   msg.textContent = '';
 
@@ -1457,6 +1510,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     }
     if(btn.dataset.page === 'chat'){
       startChatListener();
+      refreshMessageLimitUI(document.getElementById('chatInput'), document.getElementById('chatCharLimitHint'));
       document.getElementById('chatInput').focus();
     }
     if(btn.dataset.page === 'beanplus'){
@@ -1464,6 +1518,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     }
     if(btn.dataset.page === 'create'){
       setupCreatePage();
+      refreshMessageLimitUI(document.getElementById('createMessageInput'), document.getElementById('createCharLimitHint'));
     }
   });
 });
@@ -1734,10 +1789,12 @@ function renderChatMessages(msgs){
 
 let chatCooldownUntil = 0;
 
+document.getElementById('chatInput').addEventListener('input', (e) => enforceMessageLimits(e.target));
+
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = document.getElementById('chatInput');
-  const text = input.value.trim();
+  const text = sanitizeMessageInput(input.value.trim()).slice(0, getMessageCharLimit());
   if(!text || !currentUid || !currentUserDoc) return;
 
   const now = Date.now();
