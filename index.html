@@ -375,6 +375,11 @@
   .chat-message-name:hover{color:var(--yellow);text-decoration-color:var(--yellow);}
   .chat-message-time{font-size:10.5px;color:var(--muted);}
   .chat-message-text{font-size:13.5px;color:var(--text);margin-top:2px;line-height:1.45;white-space:pre-wrap;word-break:break-word;}
+  .chat-message-text a{color:var(--yellow);}
+  .chat-message-text a:hover,
+  .chat-message-text a:active,
+  .chat-message-text a:visited,
+  .chat-message-text a:focus{color:var(--yellow);}
   .chat-input-row{display:flex;gap:10px;}
   .chat-input-row input{
     flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);
@@ -1386,13 +1391,17 @@ function renderCreateSubmissions(subs){
       <div class="mini-avatar">${renderAvatarContent({avatarPhoto: sub.avatarPhoto, avatarIcon: sub.avatarIcon}, 34)}</div>
       <div class="chat-message-body">
         <div class="chat-message-head">
-          <span class="chat-message-name" style="cursor:default;">${escapeHtml(sub.username || '?')}${sub.isPlus ? CROWN_BADGE_SVG : ''}</span>
+          <button class="chat-message-name" type="button" data-uid="${sub.uid}">${escapeHtml(sub.username || '?')}${sub.isPlus ? CROWN_BADGE_SVG : ''}</button>
           <span class="chat-message-time">${timeStr}</span>
         </div>
         <div class="chat-message-text">Link: ${linkHtml}<br>Message: ${escapeHtml(sub.message || '')}</div>
       </div>
     </div>`;
   }).join('');
+
+  box.querySelectorAll('.chat-message-name').forEach(btn => {
+    btn.addEventListener('click', () => openProfileView(btn.dataset.uid));
+  });
 }
 
 document.getElementById('createForm').addEventListener('submit', async (e) => {
@@ -1701,7 +1710,7 @@ function renderChatMessages(msgs){
 
   box.innerHTML = msgs.map(msg => {
     const time = msg.createdAt && msg.createdAt.toDate ? msg.createdAt.toDate() : null;
-    const timeStr = time ? time.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : '';
+    const timeStr = time ? time.toLocaleString('en-US') : '';
     return `<div class="chat-message">
       <div class="mini-avatar">${renderAvatarContent({avatarPhoto: msg.avatarPhoto, avatarIcon: msg.avatarIcon}, 34)}</div>
       <div class="chat-message-body">
