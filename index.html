@@ -1064,10 +1064,9 @@ function isPlusActive(userDoc){
 
 /* =========================================================
    MESSAGE CHARACTER LIMITS (chat + Create)
-   Allowed characters: letters, numbers, spaces, and ?!#
+   Any character is allowed (letters, numbers, emoji, symbols, etc.).
    Free users: 500 characters. Bean Plus members: 1000 characters.
    ========================================================= */
-const MESSAGE_ALLOWED_CHARS_REGEX = /[^a-zA-Z0-9?!# ]/g;
 const MESSAGE_CHAR_LIMIT_FREE = 500;
 const MESSAGE_CHAR_LIMIT_PLUS = 1000;
 
@@ -1076,22 +1075,21 @@ function getMessageCharLimit(){
   return isPlusActive(currentUserDoc) ? MESSAGE_CHAR_LIMIT_PLUS : MESSAGE_CHAR_LIMIT_FREE;
 }
 
-// Removes any character that isn't a letter, number, space, or ?!#
+// No character-type filtering anymore -- every character (emoji included) is allowed.
 function sanitizeMessageInput(value){
-  return (value || '').replace(MESSAGE_ALLOWED_CHARS_REGEX, '');
+  return (value || '');
 }
 
-// Applies the allowed-character filter and the dynamic max length (500, or 1000
-// with Bean Plus) to a chat/Create text field. Keeps the caret position stable.
+// Applies the dynamic max length (500, or 1000 with Bean Plus) to a chat/Create
+// text field. No characters are filtered out. Keeps the caret position stable.
 function enforceMessageLimits(el){
   const limit = getMessageCharLimit();
   el.setAttribute('maxlength', String(limit));
-  const cleaned = sanitizeMessageInput(el.value).slice(0, limit);
+  const cleaned = Array.from(el.value).slice(0, limit).join('');
   if(cleaned !== el.value){
     const pos = el.selectionStart;
-    const removedBefore = el.value.slice(0, pos).length - sanitizeMessageInput(el.value.slice(0, pos)).length;
     el.value = cleaned;
-    const newPos = Math.max(0, Math.min(cleaned.length, pos - removedBefore));
+    const newPos = Math.max(0, Math.min(cleaned.length, pos));
     el.setSelectionRange(newPos, newPos);
   }
 }
